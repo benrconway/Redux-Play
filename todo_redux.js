@@ -193,6 +193,7 @@ class TodoApp extends Component {
             type: 'TOGGLE_TODO',
             id
           })}
+          ></TodoList>
         <p>
           Show:
           {' '}
