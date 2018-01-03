@@ -61,10 +61,7 @@ const visibilityFilter = (state = 'SHOW_ALL', action) => {
 
 
 const { combineReducers } = Redux;
-const todoApp = combineReducers({
-  todos,
-  visibilityFilter
-});
+const todoApp = combineReducers({ todos, visibilityFilter });
 
 // the combined reducer is now placed inside the store which holds the state.
 const { createStore } = Redux;
@@ -72,12 +69,8 @@ const store = createStore(todoApp);
 
 const { Component } = React;
 
-// A new functional component for activating filters on the todo list.
-const FilterLink = ({
-  filter,
-  children
-}) => {
-  if(filter === currentFilter){
+const Link = ({ active, children, onClick }) => {
+  if(active) {
     return <span>{children}</span>
   }
 
@@ -85,10 +78,7 @@ const FilterLink = ({
     <a href='#'
       onClick={e => {
         e.preventDefault();
-        store.dispatch({
-          type: 'SET_VISIBILITY_FILTER',
-          filter
-        });
+        onClick();
       }}
       >
         {children}
@@ -96,16 +86,66 @@ const FilterLink = ({
   );
 };
 
-const Todo =({
-  onClick,
-  completed,
-  text
-}) => (
+class FilterLink extends Component {
+  componentDidMount() {
+    this.unsubscribe = store.subscribe(()=>
+      this.forceUpdate()
+    );
+  }
+
+  componentWillUnmount() {
+    this.unsubscribe();
+  }
+
+  render() {
+    const props = this.props;
+    const state = store.getState();
+
+    return (
+      <Link
+        active={props.filter === state.visibilityFilter}
+        onClick={() =>
+          store.dispatch({
+            type: 'SET_VISIBILITY_FILTER',
+            filter: props.filter
+          })
+        }
+      >
+        {props.children}
+      </Link>
+    );
+  }
+}
+
+const Footer = () => (
+  <p>
+    Show:
+    {' '}
+    <FilterLink
+      filter='SHOW_ALL'
+    >
+      All
+    </FilterLink>
+    {' '}
+    <FilterLink
+      filter='SHOW_ACTIVE'
+    >
+      Active
+    </FilterLink>
+    {' '}
+    <FilterLink
+      filter='SHOW_COMPLETED'
+    >
+      Completed
+    </FilterLink>
+  </p>
+)
+
+const Todo =({onClick, completed, text}) => (
   <li
-    //This onClick will activate whatever behaviour is sent through props
     onClick={onClick}>
     {/*  personally keep this in CSS, but for the purpose of learning. */}
-    {/* the styling below will cause it to be struck through  */}
+    {/* the styling below will cause the todo to be struck through when toggled  */}
     style={{
       textDecoration:
         completed ? 'line-through' : 'none'
@@ -115,10 +155,7 @@ const Todo =({
   </li>
 );
 
-const TodoList = ({
-  todos,
-  onTodoClick
-}) => (
+const TodoList = ({todos, onTodoClick}) => (
   <ul>
     {todos.map(todo =>
       <Todo
@@ -129,6 +166,27 @@ const TodoList = ({
     )}
   </ul>
 )
+
+let nextTodoId = 0;
+const AddTodo = () => {
+  let input;
+    <div>
+      <input ref={node => {
+        input = node;
+      }} />
+      <button onClick={() => {
+        store.dipatch({
+          type: 'ADD_TODO',
+          id: nextTodoId++,
+          text: input.value
+        })
+        // and here the input is rendered blank as it is saved to the list.
+        input.value = '';
+      }}>
+        Add TODO
+      </button>
+    </div>
+  }
 
 
 //A function that filters the visible todos based on whether or not they are
@@ -150,86 +208,44 @@ const getVisibileTodos = (todos, filter) => {
   }
 }
 
-let nextTodoId = 0;
-class TodoApp extends Component {
-  render () {
-    // I don't yet understand, but this action takes these two things out of
-    // 'this.props.etc' and allows more direct access in the following functions
-    const {
-      todos,
-      visibilityFilter
-    } = this.props;
-    //previously, this had this.props.todos etc, variable above removes the need
-    // through JS magic as yet not understood.
-    const visibleTodos = getVisibileTodos(
-      todos,
-      visibilityFilter
+class VisibleTodoList extends Component {
+  componentDidMount() {
+    this.unsubscribe = store.subscribe(()=>
+      this.forceUpdate()
     );
+  }
+
+  componentWillUnmount() {
+    this.unsubscribe();
+  }
+
+  render() {
+    const props = this.props;
+    const state = store.getState();
+
     return (
-      <div>
-        {/* this input is able to call upon part of the react library
-          allowing the node to have a name and thus be called further down */}
-        <input ref={node => {
-          this.input = node;
-        }} />
-        <button onClick={() => {
-          // state can only be altered by dispatching actions to the store.
-          // its type will inform whether or not a change is made to the state.
-          store.dispatch({
-            type: 'ADD_TODO',
-            // this is where the node is called to supply its value.
-            text: this.input.value;,
-            id: nextTodoId++
-            })
-            // and here the input is rendered blank as it is saved to the list.
-            this.input.value = '';
-        }}>
-          Add TODO
-        </button>
-        <TodoList
-          todos={visibleTodos}
-          onTodoClick={id=>
-          store.dispatch({
-            type: 'TOGGLE_TODO',
-            id
-          })}
-          ></TodoList>
-        <p>
-          Show:
-          {' '}
-          <FilterLink
-            filter='SHOW_ALL'
-            currentFilter={visibilityFilter}
-          >
-            All
-          </FilterLink>
-          {' '}
-          <FilterLink
-            filter='SHOW_ACTIVE'
-            currentFilter={visibilityFilter}
-          >
-            Active
-          </FilterLink>
-          {' '}
-          <FilterLink
-            filter='SHOW_COMPLETED'
-            currentFilter={visibilityFilter}
-          >
-            Completed
-          </FilterLink>
-        </p>
-      </div>
-    );
+      <TodoList
+        todos={getVisibileTodos(state.todos, state.visibilityFilter)}
+        onTodoClick={id=> store.dispatch({
+          type: 'TOGGLE_TODO',
+          id
+        })}
+      />
+    )
   }
 }
 
 
-const render = () => {
-  // these todos are the props being passed down.
+const TodoApp = () => (
+  <div>
+    <AddTodo />
+    <VisibleTodoList />
+    <Footer />
+  </div>
+);
+
   ReactDom.render(
-    <TodoApp
-      {...store.getState()}
-    />,
+    <TodoApp />,
     document.getElementById('root')
   );
 };
