@@ -63,9 +63,7 @@ const visibilityFilter = (state = 'SHOW_ALL', action) => {
 const { combineReducers } = Redux;
 const todoApp = combineReducers({ todos, visibilityFilter });
 
-// the combined reducer is now placed inside the store which holds the state.
-const { createStore } = Redux;
-const store = createStore(todoApp);
+
 
 const { Component } = React;
 
@@ -88,6 +86,7 @@ const Link = ({ active, children, onClick }) => {
 
 class FilterLink extends Component {
   componentDidMount() {
+    const { store } = this.context;
     this.unsubscribe = store.subscribe(()=>
       this.forceUpdate()
     );
@@ -99,6 +98,7 @@ class FilterLink extends Component {
 
   render() {
     const props = this.props;
+    const { store } = this.context;
     const state = store.getState();
 
     return (
@@ -116,6 +116,9 @@ class FilterLink extends Component {
     );
   }
 }
+FilterLink.contextTypes = {
+  store: React.PropTypes.object
+};
 
 const Footer = () => (
   <p>
@@ -126,13 +129,13 @@ const Footer = () => (
     >
       All
     </FilterLink>
-    {' '}
+    {', '}
     <FilterLink
       filter='SHOW_ACTIVE'
     >
       Active
     </FilterLink>
-    {' '}
+    {', '}
     <FilterLink
       filter='SHOW_COMPLETED'
     >
@@ -168,7 +171,9 @@ const TodoList = ({todos, onTodoClick}) => (
 )
 
 let nextTodoId = 0;
-const AddTodo = () => {
+// the second argument is the context, which has the "{store}" arguement to
+// take only the singular part of the greater context.
+const AddTodo = (props, { store }) => {
   let input;
     <div>
       <input ref={node => {
@@ -187,7 +192,11 @@ const AddTodo = () => {
       </button>
     </div>
   }
-
+// If you want the context to work, it must be declared in the following.
+// If you skip the declaration, it will not receive the context as an argument.
+AddTodo.contextTypes = {
+  store: React.PropTypes.object
+};
 
 //A function that filters the visible todos based on whether or not they are
 // completed and this is called in the render to provide a list from those
@@ -210,6 +219,7 @@ const getVisibileTodos = (todos, filter) => {
 
 class VisibleTodoList extends Component {
   componentDidMount() {
+    const { store } = this.context;
     this.unsubscribe = store.subscribe(()=>
       this.forceUpdate()
     );
@@ -221,6 +231,7 @@ class VisibleTodoList extends Component {
 
   render() {
     const props = this.props;
+    const { store } = this.context;
     const state = store.getState();
 
     return (
@@ -234,22 +245,46 @@ class VisibleTodoList extends Component {
     )
   }
 }
-
+VisibleTodoList.contextTypes = {
+  store: React.PropTypes.object
+};
 
 const TodoApp = () => (
   <div>
     <AddTodo />
-    <VisibleTodoList />
+    <VisibleTodoList  />
     <Footer />
   </div>
 );
 
+
+//This provider class allows us to pass the store down implicitly by context rather
+// than explicitly through props.
+class Provider extends Component {
+  getChildContext() {
+    return {
+      store: this.props.store;
+    };
+  }
+
+
+  render() {
+    return this.props.children;
+  }
+}
+//This line allows the other components to hook into this specific attribute
+// with this key and it needs to be an object.
+Provider.childContextTypes = {
+  store: React.PropTypes.object
+};
+
+// the combined reducer is now placed inside the store which holds the state.
+const { createStore } = Redux;
+
   ReactDom.render(
-    <TodoApp />,
+    <Provider store={createStore(todoApp)}>
+      <TodoApp  />
+    </Provider>,
     document.getElementById('root')
   );
 };
-// this subscribe method will actively re-render the dom when the state has been
-// changed within the store.
-store.subscribe(render);
-render();
