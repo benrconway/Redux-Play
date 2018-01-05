@@ -4,6 +4,36 @@
 // and this will change the data in the state which is held external to the application
 // in a place called "the store".
 
+
+//In redux, everything that changes, both UI and otherwise has its information held
+// within the State or State Tree.
+
+// Any changes to that state will be made possible through defined Actions
+
+//These are action creator functions.
+let nextTodoId = 0;
+const addTodo = (text) => {
+  return {
+    type: 'ADD_TODO',
+    id: nextTodoId++;,
+    text
+  };
+};
+
+const toggleTodo = (id) => {
+  return {
+    type: 'TOGGLE_TODO',
+    id
+  };
+}
+
+const setVisibilityFilter = (filter) => {
+  return {
+      type: 'SET_VISIBILITY_FILTER',
+      filter: filter
+  };
+};
+
 const todo = (state, action) => {
   switch (action.type) {
     case 'ADD_TODO':
@@ -52,7 +82,7 @@ const visibilityFilter = (state = 'SHOW_ALL', action) => {
   }
 };
 // Seeing as many reducers are commonly used to effectively seperate the functionality
-// into readable understandable code, there following is how to combine them all
+// into readable understandable code, the following is how to combine them all
 // into the reducer used by the store to aggregate all the information needed.
 
 // In the example below, they are associated key/value pairs, but es6 has the
@@ -83,62 +113,72 @@ const Link = ({ active, children, onClick }) => {
       </a>
   );
 };
-
-class FilterLink extends Component {
-  componentDidMount() {
-    const { store } = this.context;
-    this.unsubscribe = store.subscribe(()=>
-      this.forceUpdate()
-    );
-  }
-
-  componentWillUnmount() {
-    this.unsubscribe();
-  }
-
-  render() {
-    const props = this.props;
-    const { store } = this.context;
-    const state = store.getState();
-
-    return (
-      <Link
-        active={props.filter === state.visibilityFilter}
-        onClick={() =>
-          store.dispatch({
-            type: 'SET_VISIBILITY_FILTER',
-            filter: props.filter
-          })
-        }
-      >
-        {props.children}
-      </Link>
-    );
-  }
-}
-FilterLink.contextTypes = {
-  store: React.PropTypes.object
+//This will replace the filterlink class below.
+// Own props is clear about the container component props, as opposed to the return
+// value of mapstatetoprops which is given to its children.
+const mapStateToLinkProps = (state, ownProps) => {
+  return {
+    active: ownProps.filter === state.visibilityFilter
+  };
 };
+const mapDispatchToLinkProps = (dispatch, ownProps) => {
+  return {
+    onClick: () => dispatch(setVisibilityFilter(ownProps.filter))
+  };
+};
+const FilterLink = connect(mapStateToLinkProps, mapDispatchToLinkProps)(Link)
+
+// class FilterLink extends Component {
+//   componentDidMount() {
+//     const { store } = this.context;
+//     this.unsubscribe = store.subscribe(()=>
+//       this.forceUpdate()
+//     );
+//   }
+//
+//   componentWillUnmount() {
+//     this.unsubscribe();
+//   }
+//
+//   render() {
+//     const props = this.props;
+//     const { store } = this.context;
+//     const state = store.getState();
+//
+//     return (
+//       <Link
+//         active={props.filter === state.visibilityFilter}
+//         onClick={ () =>
+//           store.dispatch({
+//             type: 'SET_VISIBILITY_FILTER',
+//             filter: props.filter
+//           })
+//         }
+//       >
+//         {props.children}
+//       </Link>
+//     );
+//   }
+// }
+// // If you want the context to work, it must be declared in the following.
+// // If you skip the declaration, it will not receive the context as an argument.
+// FilterLink.contextTypes = {
+//   store: React.PropTypes.object
+// };
 
 const Footer = () => (
   <p>
     Show:
     {' '}
-    <FilterLink
-      filter='SHOW_ALL'
-    >
+    <FilterLink filter='SHOW_ALL'>
       All
     </FilterLink>
     {', '}
-    <FilterLink
-      filter='SHOW_ACTIVE'
-    >
+    <FilterLink filter='SHOW_ACTIVE'>
       Active
     </FilterLink>
     {', '}
-    <FilterLink
-      filter='SHOW_COMPLETED'
-    >
+    <FilterLink filter='SHOW_COMPLETED'>
       Completed
     </FilterLink>
   </p>
@@ -170,33 +210,29 @@ const TodoList = ({todos, onTodoClick}) => (
   </ul>
 )
 
-let nextTodoId = 0;
+
 // the second argument is the context, which has the "{store}" arguement to
 // take only the singular part of the greater context.
-const AddTodo = (props, { store }) => {
+let AddTodo = ({ dispatch }) => {
   let input;
+
+  return (
     <div>
-      <input ref={node => {
-        input = node;
-      }} />
+      <input ref={ node => { input = node; }} />
       <button onClick={() => {
-        store.dipatch({
-          type: 'ADD_TODO',
-          id: nextTodoId++,
-          text: input.value
-        })
-        // and here the input is rendered blank as it is saved to the list.
+        dipatch(addTodo(input.value))
+        //After dispatching a new todo to the store, the input is made blank.
         input.value = '';
       }}>
         Add TODO
       </button>
     </div>
-  }
-// If you want the context to work, it must be declared in the following.
-// If you skip the declaration, it will not receive the context as an argument.
-AddTodo.contextTypes = {
-  store: React.PropTypes.object
+  );
 };
+  // Connect without arguments will cause ReactRedux to generate a component that
+  // doesn't subscribe to the store, however it will inject dispatch to whatever it
+  // wrapping. Below it is wrapping the AddTodo.
+AddTodo = connect()(AddToDo);
 
 //A function that filters the visible todos based on whether or not they are
 // completed and this is called in the render to provide a list from those
@@ -217,37 +253,54 @@ const getVisibileTodos = (todos, filter) => {
   }
 }
 
-class VisibleTodoList extends Component {
-  componentDidMount() {
-    const { store } = this.context;
-    this.unsubscribe = store.subscribe(()=>
-      this.forceUpdate()
-    );
-  }
+const { connect } = ReactRedux;
 
-  componentWillUnmount() {
-    this.unsubscribe();
+//This re-writes the VisibleTodoList class below using the connect
+// functon from ReactRedux
+const mapStateToTodoListProps = (state) => {
+  return {
+    todos: getVisibileTodos(state.todos, state.visibilityFilter)
   }
-
-  render() {
-    const props = this.props;
-    const { store } = this.context;
-    const state = store.getState();
-
-    return (
-      <TodoList
-        todos={getVisibileTodos(state.todos, state.visibilityFilter)}
-        onTodoClick={id=> store.dispatch({
-          type: 'TOGGLE_TODO',
-          id
-        })}
-      />
-    )
-  }
-}
-VisibleTodoList.contextTypes = {
-  store: React.PropTypes.object
 };
+const mapDispatchToTodoListProps = (dispatch) => {
+  return {
+    onTodoClick: (id) => {
+      dispatch(toggleTodo(id))
+    };
+  };
+};
+
+// This is the container, with the connect and its props, and callback props
+const VisibleTodoList = connect(
+  mapStateToTodoListProps,
+  mapDispatchToTodoListProps
+)(TodoList);
+
+// class VisibleTodoList extends Component {
+//   componentDidMount() {
+//     const { store } = this.context;
+//     this.unsubscribe = store.subscribe(()=>
+//       this.forceUpdate()
+//     );
+//   }
+//
+//   componentWillUnmount() {
+//     this.unsubscribe();
+//   }
+//
+//   render() {
+//     const props = this.props;
+//     const { store } = this.context;
+//     const state = store.getState();
+//
+//     return (
+//       <TodoList />
+//     )
+//   }
+// }
+// VisibleTodoList.contextTypes = {
+//   store: React.PropTypes.object
+// };
 
 const TodoApp = () => (
   <div>
@@ -257,30 +310,37 @@ const TodoApp = () => (
   </div>
 );
 
+//The whole Provider class written out below exists in the react-redux library
 
 //This provider class allows us to pass the store down implicitly by context rather
 // than explicitly through props.
-class Provider extends Component {
-  getChildContext() {
-    return {
-      store: this.props.store;
-    };
-  }
+// class Provider extends Component {
+//   getChildContext() {
+//     return {
+//       store: this.props.store;
+//     };
+//   }
+//
+//
+//   render() {
+//     return this.props.children;
+//   }
+// }
+// //This line allows the other components to hook into this specific attribute
+// // with this key and it needs to be an object.
+// Provider.childContextTypes = {
+//   store: React.PropTypes.object
+// };
 
+//ES6 syntax
+const { Provider } = ReactRedux;
+//import { Provider } from 'react-redux';
+//var Provider = require('react-redux').Provider;
 
-  render() {
-    return this.props.children;
-  }
-}
-//This line allows the other components to hook into this specific attribute
-// with this key and it needs to be an object.
-Provider.childContextTypes = {
-  store: React.PropTypes.object
-};
-
-// the combined reducer is now placed inside the store which holds the state.
+// creates the store which needs a reducer to refer back to.
 const { createStore } = Redux;
 
+// the combined reducer is placed inside the store which holds the state.
   ReactDom.render(
     <Provider store={createStore(todoApp)}>
       <TodoApp  />
